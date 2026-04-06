@@ -1,4 +1,12 @@
-streamlit
-google-generativeai
-PyPDF2
+streamlit==1.38.0
+google-generativeai==0.8.3
+PyPDF2==3.0.1
 Pillow
+
+**Thao tác cuối cùng trên Streamlit Cloud:**
+Sau khi bạn đã sửa `app.py` và `requirements.txt` trên GitHub xong, hãy làm bước này để máy chủ cài đặt lại từ đầu:
+1. Vào trang quản lý ứng dụng của Streamlit.
+2. Bấm vào nút có biểu tượng 3 dấu chấm (`⋮`) ở góc trên cùng bên phải.
+3. Chọn **Reboot app** (Khởi động lại ứng dụng).
+
+Lúc này, máy chủ sẽ đọc lại file `requirements.txt` mới, tự động cài phiên bản AI mới nhất và áp dụng hàm chống lỗi 404 tôi vừa viết. Đảm bảo App của bạn sẽ chạy "ngon ơ" và trông cực kỳ xịn xò! Chúc bạn thành công!
