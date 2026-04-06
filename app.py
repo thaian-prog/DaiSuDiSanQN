@@ -2,132 +2,251 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 import PyPDF2
-import io
 import streamlit.components.v1 as components
 
 # ==========================================
-# CẤU HÌNH GIAO DIỆN STREAMLIT
+# CẤU HÌNH GIAO DIỆN STREAMLIT (NÂNG CẤP)
 # ==========================================
 st.set_page_config(page_title="Đại Sứ Di Sản Quảng Ninh", page_icon="🌊", layout="centered")
 
-# ==========================================
-# HÀM XỬ LÝ RAG (ĐỌC FILE PDF)
-# ==========================================
-@st.cache_data
-def extract_text_from_pdf(uploaded_file):
-    """Trích xuất văn bản từ file PDF Tài liệu GDĐP để làm Knowledge Base"""
-    try:
-        reader = PyPDF2.PdfReader(uploaded_file)
-        text = ""
-        for page in reader.pages[:15]: # Đọc 15 trang đầu
-            text += page.extract_text() + "\n"
-        return text
-    except Exception as e:
-        return f"Lỗi đọc file PDF: {e}"
+# CUSTOM CSS: Làm giao diện chuyên nghiệp, giống Web App thật hơn
+st.markdown("""
+<style>
+    /* Ẩn menu và footer mặc định của Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Style cho header chính */
+    .main-header {
+        background: linear-gradient(135deg, #0284c7, #0ea5e9);
+        padding: 2rem 1rem;
+        border-radius: 12px;
+        color: white;
+        text-align: center;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    .main-header h1 {
+        color: white !important;
+        font-size: 2.2rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+    }
+    .main-header p {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        margin-bottom: 0;
+    }
+    
+    /* Style cho các Nút bấm (Buttons) */
+    .stButton>button {
+        width: 100%;
+        border-radius: 8px;
+        background-color: #0ea5e9;
+        color: white;
+        font-weight: bold;
+        border: none;
+        padding: 0.6rem 1rem;
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #0284c7;
+        color: white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+    }
+    
+    /* Style cho các Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px 8px 0 0;
+        padding: 10px 16px;
+        background-color: #f1f5f9;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #e0f2fe;
+        border-bottom: 3px solid #0ea5e9;
+        color: #0284c7;
+        font-weight: 600;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ==========================================
-# GIAO DIỆN CHÍNH & SIDEBAR
+# HÀM XỬ LÝ RAG - HỖ TRỢ NHIỀU FILE
 # ==========================================
-st.title("🌊 Khám Phá Di Sản Quảng Ninh Cùng AI")
-st.markdown("*Ứng dụng nhận diện, kể chuyện và xuyên không lịch sử*")
+@st.cache_data(show_spinner=False)
+def extract_text_from_pdfs(uploaded_files):
+    """Trích xuất văn bản từ NHIỀU file PDF"""
+    text = ""
+    for file in uploaded_files:
+        try:
+            reader = PyPDF2.PdfReader(file)
+            for page in reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
+        except Exception as e:
+            st.sidebar.error(f"Lỗi đọc file {file.name}: {e}")
+    return text
 
+# ==========================================
+# GIAO DIỆN CHÍNH
+# ==========================================
+st.markdown("""
+<div class="main-header">
+    <h1>🌊 Đại Sứ Di Sản Quảng Ninh</h1>
+    <p>Trí tuệ Nhân tạo kết nối Thế hệ trẻ & Lịch sử quê hương</p>
+</div>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# SIDEBAR: CÀI ĐẶT & KHO TRI THỨC
+# ==========================================
 with st.sidebar:
-    st.header("⚙️ Cài đặt (Dành cho Giáo viên)")
+    st.markdown("### 🛡️ TRUNG TÂM ĐIỀU KHIỂN")
     
-    # Ưu tiên lấy API Key từ cấu hình bảo mật của Streamlit Cloud (Secrets)
+    # XỬ LÝ BẢO MẬT API KEY (Ẩn hoàn toàn nếu đã có trong Secrets)
+    api_key = ""
     try:
-        secret_api_key = st.secrets["GEMINI_API_KEY"]
-    except:
-        secret_api_key = ""
-        
-    api_key = st.text_input("Nhập Google Gemini API Key:", value=secret_api_key, type="password", help="Nếu đã cấu hình trong Secrets, không cần nhập lại.")
+        api_key = st.secrets["GEMINI_API_KEY"]
+        st.success("✅ Đã kết nối API an toàn từ máy chủ!")
+    except Exception:
+        st.warning("⚠️ Chưa cấu hình API Key trên máy chủ.")
+        api_key = st.text_input("🔑 Nhập Gemini API Key của bạn:", type="password", help="Chỉ dùng tạm thời. Hãy cài đặt trong Streamlit Secrets để ẩn hoàn toàn ô này.")
+
+    st.markdown("---")
+    st.markdown("### 📚 KHO TRI THỨC ĐỊA PHƯƠNG")
+    st.caption("Tải lên các tài liệu GDĐP Quảng Ninh để AI tham chiếu thông tin chính xác.")
     
-    st.subheader("📚 Nạp Kiến Thức (RAG)")
-    st.info("Tải lên 'Tài liệu GDĐP tỉnh Quảng Ninh' (PDF) để AI trả lời chính xác 100%.")
-    pdf_file = st.file_uploader("Tải file PDF", type=["pdf"])
+    # HỖ TRỢ UPLOAD NHIỀU FILE
+    pdf_files = st.file_uploader("Chọn một hoặc nhiều file PDF", type=["pdf"], accept_multiple_files=True)
     
     context_text = ""
-    if pdf_file is not None:
-        with st.spinner("Đang xử lý dữ liệu địa phương..."):
-            context_text = extract_text_from_pdf(pdf_file)
-        st.success("Đã nạp kiến thức thành công!")
+    if pdf_files:
+        with st.spinner("Đang đọc và xử lý tài liệu..."):
+            context_text = extract_text_from_pdfs(pdf_files)
+        if context_text:
+            st.success(f"🎉 Đã nạp thành công {len(pdf_files)} tài liệu!")
 
 # ==========================================
-# XỬ LÝ ẢNH & LOGIC AI
+# XỬ LÝ LÕI ỨNG DỤNG AI
 # ==========================================
 if api_key:
     genai.configure(api_key=api_key)
-    # Sử dụng model public ổn định nhất của Google cho xử lý đa phương thức
+    # Khởi tạo model mạnh mẽ nhất cho Đa phương thức
     model = genai.GenerativeModel('gemini-1.5-flash')
     
-    st.subheader("📸 Chụp hoặc Tải ảnh di sản/món ăn")
+    st.markdown("### 📸 Tải Ảnh Di Sản / Ẩm Thực")
     
-    img_file = st.file_uploader("Chọn ảnh từ thư viện", type=['png', 'jpg', 'jpeg'])
-    camera_file = st.camera_input("Hoặc dùng Camera để chụp trực tiếp")
+    col1, col2 = st.columns(2)
+    with col1:
+        img_file = st.file_uploader("📂 Tải ảnh từ máy", type=['png', 'jpg', 'jpeg'])
+    with col2:
+        camera_file = st.camera_input("📷 Chụp ảnh trực tiếp")
     
     target_image = img_file if img_file else camera_file
     
     if target_image is not None:
         img = Image.open(target_image)
-        st.image(img, caption="Ảnh bạn vừa tải lên", use_column_width=True)
+        # Hiển thị ảnh một cách gọn gàng
+        st.image(img, caption="Tác phẩm của bạn", use_column_width=True)
         
-        tab1, tab2, tab3 = st.tabs(["🗣️ Kể chuyện & Nhận diện", "🌀 Xuyên Không", "🪪 Thẻ Đại Sứ"])
+        st.markdown("---")
         
-        story_prompt = f"""
-        Bạn là 'Trợ lý ảo Di sản Quảng Ninh'. Hãy nhìn bức ảnh và thực hiện:
-        1. Nhận diện bức ảnh này là danh thắng hay món ăn nào của Quảng Ninh.
-        2. Viết một đoạn hội thoại ngắn giữa "Trợ lý ảo" (giọng điệu uyên bác) và "Đại sứ học sinh" (giọng điệu Gen Z, năng động, dùng từ lóng vui vẻ như 'flex', 'đỉnh chóp').
-        Dữ liệu tham khảo bắt buộc (Tài liệu GDĐP Quảng Ninh):
-        {context_text[:3000] if context_text else "Hãy dùng kiến thức chuẩn xác nhất của bạn về Quảng Ninh."}
-        """
+        # CHIA TABS TÍNH NĂNG
+        tab1, tab2, tab3 = st.tabs(["🗣️ Hỏi Đáp Tri Thức", "🌀 Xuyên Không", "🪪 Thẻ Đại Sứ"])
         
         with tab1:
-            if st.button("Phân tích & Kể chuyện"):
-                with st.spinner("Đang phân tích và sáng tác kịch bản..."):
+            st.markdown("#### Khám phá câu chuyện đằng sau bức ảnh")
+            if st.button("Phân tích & Kể chuyện ngay"):
+                story_prompt = f"""
+                Bạn là 'Trợ lý ảo Di sản Quảng Ninh'. Hãy nhìn bức ảnh và thực hiện:
+                1. Nhận diện bức ảnh này là danh thắng hay món ăn nào của Quảng Ninh.
+                2. Viết một đoạn hội thoại ngắn, sống động giữa "Trợ lý ảo" (giọng điệu uyên bác, tự hào) và "Đại sứ học sinh" (giọng điệu Gen Z, năng động, dùng từ lóng vui vẻ như 'flex', 'đỉnh chóp', 'chuẩn không cần chỉnh').
+                3. Đảm bảo cung cấp thông tin lịch sử/địa lý/văn hóa chính xác.
+
+                Dữ liệu tham khảo bắt buộc (Trích từ Tài liệu GDĐP Quảng Ninh):
+                ---
+                {context_text if context_text else "Không có tài liệu tham khảo nào được cung cấp. Hãy dùng kiến thức mặc định chuẩn xác nhất của bạn về Quảng Ninh."}
+                ---
+                """
+                with st.spinner("Đang rà soát kho tri thức và sáng tác kịch bản..."):
                     try:
                         response = model.generate_content([story_prompt, img])
-                        st.markdown("### 🎙️ Câu chuyện Di sản")
+                        
+                        # Hiển thị đẹp mắt giống giao diện chat
+                        st.info("💡 **Kết quả phân tích từ AI:**")
                         st.write(response.text)
                     except Exception as e:
-                        st.error(f"Lỗi AI: {e}. Vui lòng kiểm tra lại API Key hoặc mạng.")
+                        st.error(f"Lỗi kết nối AI: {e}")
                         
         with tab2:
-            st.markdown("### 🌀 Mô tả bối cảnh Xuyên Không")
-            if st.button("Kích hoạt vòng xoáy thời gian"):
-                time_travel_prompt = "Dựa vào bức ảnh này, hãy tạo một đoạn mô tả (prompt) cực kỳ chi tiết, hùng tráng và sống động về bối cảnh lịch sử hoặc địa chất của địa danh này hàng trăm hoặc hàng triệu năm trước bằng tiếng Việt."
-                with st.spinner("Đang du hành thời gian..."):
+            st.markdown("#### Du hành vượt thời gian")
+            st.caption("AI sẽ phân tích hình ảnh và tạo ra một mô tả cực kỳ hùng tráng về địa danh này trong quá khứ.")
+            if st.button("Kích hoạt Vòng Xoáy Thời Gian ⏳"):
+                time_travel_prompt = f"""
+                Dựa vào bức ảnh này và tài liệu sau đây (nếu có), hãy tạo một đoạn mô tả (prompt) cực kỳ chi tiết, hùng tráng và sống động về bối cảnh lịch sử hoặc địa chất của địa danh này hàng trăm hoặc hàng triệu năm trước. 
+                Văn phong điện ảnh, tập trung vào ánh sáng, không khí, hoạt động quân sự hoặc sự biến đổi của thiên nhiên kỳ vĩ.
+                
+                Tài liệu tham khảo: {context_text[:5000] if context_text else "Không có."}
+                """
+                with st.spinner("Đang tính toán tọa độ không - thời gian..."):
                     try:
                         tt_response = model.generate_content([time_travel_prompt, img])
-                        st.success("Mô tả Xuyên không của bạn:")
+                        st.success("✨ Cánh cổng thời gian đã mở!")
                         st.write(tt_response.text)
                     except Exception as e:
                         st.error(f"Lỗi AI: {e}")
                         
         with tab3:
-            st.markdown("### 🪪 Chia sẻ thông điệp Đại sứ")
-            user_name = st.text_input("Nhập tên của bạn (Đại sứ):", "Gen Z Yêu Quảng Ninh")
-            message = st.text_area("Thông điệp của bạn:", "Di sản quê hương mình đỉnh chóp! Cùng nhau bảo tồn nhé mọi người!")
+            st.markdown("#### Khẳng định niềm tự hào quê hương")
+            user_name = st.text_input("Tên Đại sứ của bạn:", "Học sinh yêu Quảng Ninh")
+            message = st.text_area("Thông điệp lan tỏa:", "Di sản quê hương mình đỉnh chóp! Cùng nhau bảo vệ và phát huy nhé mọi người! ❤️")
             
-            if st.button("Tạo thẻ Kỹ thuật số"):
+            if st.button("Tạo thẻ Kỹ thuật số 💳"):
+                # Giao diện thẻ được thiết kế lại đẹp và chuyên nghiệp hơn bằng Tailwind
                 card_html = f"""
                 <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-                <div class="max-w-md mx-auto bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl shadow-lg overflow-hidden md:max-w-2xl m-4 border-l-4 border-blue-500">
-                    <div class="p-6">
-                        <div class="flex items-center space-x-4 mb-4">
-                            <div class="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xl">QN</div>
-                            <div>
-                                <div class="uppercase tracking-wide text-sm text-blue-600 font-bold">Đại sứ Di sản Quảng Ninh</div>
-                                <p class="text-gray-800 font-semibold">{user_name}</p>
+                <div class="flex justify-center items-center py-4">
+                    <div class="relative bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
+                        <div class="absolute top-0 w-full h-2 bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400"></div>
+                        <div class="p-6">
+                            <div class="flex items-center space-x-4 mb-6">
+                                <div class="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white font-extrabold text-2xl shadow-lg">
+                                    QN
+                                </div>
+                                <div>
+                                    <div class="uppercase tracking-wider text-xs text-blue-500 font-bold mb-1">Đại sứ Di sản Kỹ thuật số</div>
+                                    <p class="text-gray-800 font-bold text-lg leading-tight">{user_name}</p>
+                                </div>
                             </div>
-                        </div>
-                        <div class="bg-white p-4 rounded-lg shadow-inner mb-4 italic text-gray-700">"{message}"</div>
-                        <div class="mt-4 flex justify-between items-center text-xs text-gray-500 font-medium">
-                            <span>📱 Quét & Khám phá</span>
-                            <span>Powered by AI & Gen Z</span>
+                            
+                            <div class="relative bg-blue-50 p-5 rounded-xl border border-blue-100 mb-6">
+                                <svg class="absolute top-2 left-2 w-6 h-6 text-blue-200" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/></svg>
+                                <p class="text-gray-700 font-medium italic text-center px-4">
+                                    {message}
+                                </p>
+                            </div>
+                            
+                            <div class="flex justify-between items-center border-t border-gray-100 pt-4">
+                                <div class="flex items-center space-x-2">
+                                    <span class="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                    <span class="text-xs text-gray-500 font-bold">AI VERIFIED</span>
+                                </div>
+                                <div class="text-xs text-blue-400 font-bold bg-blue-50 px-3 py-1 rounded-full">
+                                    Proudly from Quang Ninh
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
                 """
-                components.html(card_html, height=250)
+                components.html(card_html, height=350)
+                st.success("Chụp ảnh màn hình thẻ này và 'flex' lên Facebook, Tiktok ngay thôi! 🚀")
+
 else:
-    st.warning("👈 Vui lòng nhập Google Gemini API Key ở thanh bên trái để bắt đầu!")
+    st.info("👈 Bắt đầu bằng cách kiểm tra hệ thống API ở thanh bên trái.")
